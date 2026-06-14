@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/scrollView"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp"
+    tools:context=".MainActivity">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/main"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <Button
+            android:id="@+id/helpButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/help"
+            android:textColor="@color/text_color"
+            android:textSize="14sp"
+            android:layout_marginTop="16dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"/>
+
+        <TextView
+        android:id="@+id/textView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/title"
+            android:textColor="@color/text_color"
+            android:textSize="16sp"
+            android:layout_marginTop="16dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/helpButton"
+            app:layout_constraintBottom_toTopOf="@+id/editText"/>
+
+    <EditText
+        android:id="@+id/editText"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:autofillHints=""
+        android:hint="@string/time"
+        android:inputType="number"
+        android:textColor="@color/text_color"
+        android:textColorHint="@color/text_color"
+        app:layout_constraintEnd_toStartOf="@+id/button"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/textView"
+        tools:ignore="TouchTargetSizeCheck,VisualLintTextFieldSize" />
+
+    <Button
+        android:id="@+id/button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="@string/save"
+        android:textColor="@color/white"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/editText"
+        app:layout_constraintTop_toTopOf="@+id/editText"/>
+
+    <TextView
+        android:id="@+id/appListTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/choose"
+        android:textColor="@color/text_color"
+        android:textSize="16sp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/button"/>
+
+    <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/appList"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/appListTitle"
+            tools:ignore="TextSizeCheck" />
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/controlsContainer"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/appList">
+
+        <TextView
+            android:id="@+id/iconSizeTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/iconsize"
+            android:textColor="@color/text_color"
+            android:textSize="16sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"/>
+
+        <TextView
+            android:id="@+id/iconSizeValue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/num1"
+            android:textColor="@color/text_color"
+            android:layout_marginStart="16dp"
+            app:layout_constraintStart_toEndOf="@+id/iconSizeTitle"
+            app:layout_constraintTop_toTopOf="@+id/iconSizeTitle"
+            app:layout_constraintBottom_toBottomOf="@+id/iconSizeTitle"/>
+
+        <SeekBar
+            android:id="@+id/iconSizeSeekBar"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:min="60"
+            android:max="200"
+            android:progress="100"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/iconSizeTitle"
+            tools:ignore="UnusedAttribute" />
+
+        <TextView
+            android:id="@+id/appSpacingTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="弹窗夹角:"
+            android:textColor="@color/text_color"
+            android:textSize="16sp"
+            android:layout_marginTop="16dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/iconSizeSeekBar"
+            tools:ignore="HardcodedText" />
+
+        <TextView
+            android:id="@+id/appSpacingValue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="30"
+            android:textColor="@color/text_color"
+            android:layout_marginStart="16dp"
+            app:layout_constraintStart_toEndOf="@+id/appSpacingTitle"
+            app:layout_constraintTop_toTopOf="@+id/appSpacingTitle"
+            app:layout_constraintBottom_toBottomOf="@+id/appSpacingTitle"
+            tools:ignore="HardcodedText" />
+
+        <SeekBar
+            android:id="@+id/appSpacingSeekBar"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:min="25"
+            android:max="45"
+            android:progress="30"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/appSpacingTitle"
+            tools:ignore="UnusedAttribute" />
+
+        <TextView
+            android:id="@+id/secondCircleRadiusTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="第二圈半径:"
+            android:textColor="@color/text_color"
+            android:textSize="16sp"
+            android:layout_marginTop="16dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/appSpacingSeekBar"
+            tools:ignore="HardcodedText" />
+
+        <TextView
+            android:id="@+id/secondCircleRadiusValue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="150"
+            android:textColor="@color/text_color"
+            android:layout_marginStart="16dp"
+            app:layout_constraintStart_toEndOf="@+id/secondCircleRadiusTitle"
+            app:layout_constraintTop_toTopOf="@+id/secondCircleRadiusTitle"
+            app:layout_constraintBottom_toBottomOf="@+id/secondCircleRadiusTitle"
+            tools:ignore="HardcodedText" />
+
+        <SeekBar
+            android:id="@+id/secondCircleRadiusSeekBar"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:max="250"
+            android:min="0"
+            android:progress="150"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/secondCircleRadiusTitle"
+            tools:ignore="UnusedAttribute" />
+
+        <TextView
+            android:id="@+id/vibrationTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/zhendong"
+            android:textColor="@color/text_color"
+            android:textSize="16sp"
+            android:layout_marginTop="16dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/secondCircleRadiusSeekBar" />
+
+        <android.widget.Switch
+            android:id="@+id/vibrationSwitch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            app:layout_constraintStart_toEndOf="@+id/vibrationTitle"
+            app:layout_constraintTop_toTopOf="@+id/vibrationTitle"
+            app:layout_constraintBottom_toBottomOf="@+id/vibrationTitle" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+        <androidx.constraintlayout.widget.Guideline
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</ScrollView>

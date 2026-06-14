@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">HOOK手势</string>
+    <string name="time">请输入延迟时间</string>
+    <string name="save">保存</string>
+    <string name="title">边缘悬停检测延迟时间（毫秒）</string>
+    <string name="choose">选择小窗应用</string>
+    <string name="iconsize">图标大小:</string>
+    <string name="num1">100</string>
+    <string name="iconlong">弹窗间距:</string>
+    <string name="num2">150</string>
+    <string name="iconnum">图标间距:</string>
+    <string name="_150">150</string>
+    <string name="zhendong">启用震动</string>
+    <string name="help">帮助</string>
+    <string name="help_title">使用说明</string>
+    <string name="help_content">1. 首先需要授予悬浮窗权限\n\n2. 本模块需要 root 权限才能正常工作\n\n3. 设置延迟时间和图标大小等参数\n\n4. 选择要在手势中显示的应用\n\n5. 长按应用图标可以取消选择\n\n6. 启用震动反馈可以获得更好的使用体验</string>
+</resources>
