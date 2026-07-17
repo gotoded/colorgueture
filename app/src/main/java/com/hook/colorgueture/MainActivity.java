@@ -893,7 +893,7 @@ public class MainActivity extends AppCompatActivity {
             boolean isSelected = false;
             for (int i = 0; i < selectedApps.size(); i++) {
                 AppInfo selectedApp = selectedApps.get(i);
-                if (i != position && selectedApp != null && selectedApp.packageName.equals(app.packageName)) {
+                if (i != position && selectedApp != null && selectedApp.packageName != null && selectedApp.packageName.equals(app.packageName)) {
                     isSelected = true;
                     break;
                 }
