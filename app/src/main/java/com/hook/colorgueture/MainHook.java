@@ -74,14 +74,12 @@ public class MainHook implements IXposedHookLoadPackage {
     private static final String MODULE_PACKAGE = "com.hook.colorgueture";
     // SharedPreferences 名称
     private static final String PREF_NAME = "ColorGueture";
-    // 应用信息缓存
-    private static final Map<String, AppInfo> appInfoCache = new HashMap<>();
-    // 缓存过期时间（毫秒）
-    private static final long CACHE_EXPIRY_TIME = 60 * 60 * 1000; // 1小时
-    // 上次缓存时间
-    private static long lastCacheTime = 0;
     // 存储当前显示的应用列表
     private static List<AppInfo> currentApps = new ArrayList<>();
+    // 缓存：包名→AppInfo (仅用于 TYPE_APP)
+    private static final Map<String, AppInfo> appInfoCache = new HashMap<>();
+    private static long lastCacheTime = 0;
+    private static final long CACHE_EXPIRY_TIME = 60 * 60 * 1000; // 1小时
     private static ClassLoader systemUIClassLoader = null;
 
 
@@ -281,8 +279,13 @@ public class MainHook implements IXposedHookLoadPackage {
                             int upHoveredIndex = detectHoveredAppIndex(upX, upY);
                             if (upHoveredIndex != -1 && !currentApps.isEmpty() && upHoveredIndex < currentApps.size()) {
                                 AppInfo appInfo = currentApps.get(upHoveredIndex);
-                                String pkg = appInfo.packageName;
-                                if (startAppInFloatMode(pkg)) {
+                                boolean executed = false;
+                                if (appInfo.type == AppInfo.TYPE_SHELL) {
+                                    executed = executeShellCommand(appInfo.shellCommand);
+                                } else {
+                                    executed = startAppInFloatMode(appInfo.packageName);
+                                }
+                                if (executed) {
                                     hidePopup();
                                     param.setResult(null);
                                     try {
@@ -527,22 +530,22 @@ public class MainHook implements IXposedHookLoadPackage {
     }
 
     /**
-     * 从 SharedPreferences 加载用户选择的应用
+     * 读取用户选择的应用和 shell 命令列表
      *
-     * @return 用户选择的应用包名列表
+     * @return 用户选择的 AppInfo 列表
      */
-    private static List<String> loadSelectedApps() {
-        List<String> list = new ArrayList<>();
+    private static List<AppInfo> loadSelectedApps() {
+        List<AppInfo> list = new ArrayList<>();
         loadFromSharedPreferences(list);
         return list;
     }
 
     /**
-     * 从 SharedPreferences 加载应用列表
+     * 从 SharedPreferences 加载应用和 shell 命令列表
      *
      * @param list 存储结果的列表
      */
-    private static void loadFromSharedPreferences(List<String> list) {
+    private static void loadFromSharedPreferences(List<AppInfo> list) {
         try {
             XSharedPreferences prefs = new XSharedPreferences(MODULE_PACKAGE, PREF_NAME);
             prefs.reload();
@@ -550,7 +553,29 @@ public class MainHook implements IXposedHookLoadPackage {
             if (json != null) {
                 JSONArray arr = new JSONArray(json);
                 for (int i = 0; i < arr.length(); i++) {
-                    list.add(arr.getString(i));
+                    try {
+                        Object element = arr.get(i);
+                        if (element instanceof org.json.JSONObject) {
+                            org.json.JSONObject obj = (org.json.JSONObject) element;
+                            int type = obj.optInt("t", AppInfo.TYPE_APP);
+                            if (type == AppInfo.TYPE_SHELL) {
+                                String cmd = obj.optString("c", "");
+                                String label = obj.optString("l", "");
+                                if (!cmd.isEmpty()) {
+                                    list.add(new AppInfo(label.isEmpty() ? "Shell" : label, cmd, null));
+                                }
+                            } else {
+                                String pkg = obj.optString("p", "");
+                                if (!pkg.isEmpty()) {
+                                    list.add(new AppInfo(pkg, pkg, null));
+                                }
+                            }
+                        } else if (element instanceof String) {
+                            // 兼容旧格式：纯字符串包名
+                            list.add(new AppInfo((String) element, (String) element, null));
+                        }
+                    } catch (Exception ignored) {
+                    }
                 }
             }
         } catch (Throwable ignored) {
@@ -567,26 +592,35 @@ public class MainHook implements IXposedHookLoadPackage {
     private static void prepareFloatWindow(Context context) {
         try {
             PackageManager pm = context.getPackageManager();
-            List<String> appPackages = loadSelectedApps();
+            List<AppInfo> slots = loadSelectedApps();
             List<AppInfo> apps = new ArrayList<>();
             long currentTime = System.currentTimeMillis();
             boolean cacheExpired = currentTime - lastCacheTime > CACHE_EXPIRY_TIME;
             int maxApps = 10;
             int appCount = 0;
-            for (String pkg : appPackages) {
+            for (AppInfo slot : slots) {
                 if (appCount >= maxApps) break;
                 try {
-                    AppInfo appInfo;
-                    if (!cacheExpired && appInfoCache.containsKey(pkg)) {
-                        appInfo = appInfoCache.get(pkg);
+                    if (slot.type == AppInfo.TYPE_SHELL) {
+                        // Shell 命令：生成终端风格图标
+                        AppInfo shellInfo = new AppInfo(slot.name, slot.shellCommand,
+                                generateShellIcon(context, slot.name));
+                        apps.add(shellInfo);
                     } else {
-                        ApplicationInfo ai = pm.getApplicationInfo(pkg, 0);
-                        String name = ai.loadLabel(pm).toString();
-                        Drawable icon = ai.loadIcon(pm);
-                        appInfo = new AppInfo(name, pkg, icon);
-                        appInfoCache.put(pkg, appInfo);
+                        // 应用：通过 PackageManager 加载
+                        String pkg = slot.packageName;
+                        AppInfo appInfo;
+                        if (!cacheExpired && appInfoCache.containsKey(pkg)) {
+                            appInfo = appInfoCache.get(pkg);
+                        } else {
+                            ApplicationInfo ai = pm.getApplicationInfo(pkg, 0);
+                            String name = ai.loadLabel(pm).toString();
+                            Drawable icon = ai.loadIcon(pm);
+                            appInfo = new AppInfo(name, pkg, icon);
+                            appInfoCache.put(pkg, appInfo);
+                        }
+                        apps.add(appInfo);
                     }
-                    apps.add(appInfo);
                     appCount++;
                 } catch (Exception ignored) {
                 }
@@ -627,27 +661,34 @@ public class MainHook implements IXposedHookLoadPackage {
         try {
             isPopupShowing = true;
             WindowManager wm = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
-            List<String> appPackages = loadSelectedApps();
+            List<AppInfo> slots = loadSelectedApps();
             PackageManager pm = context.getPackageManager();
             List<AppInfo> apps = new ArrayList<>();
             long currentTime = System.currentTimeMillis();
             boolean cacheExpired = currentTime - lastCacheTime > CACHE_EXPIRY_TIME;
             int maxApps = 10;
             int appCount = 0;
-            for (String pkg : appPackages) {
+            for (AppInfo slot : slots) {
                 if (appCount >= maxApps) break;
                 try {
-                    AppInfo appInfo;
-                    if (!cacheExpired && appInfoCache.containsKey(pkg)) {
-                        appInfo = appInfoCache.get(pkg);
+                    if (slot.type == AppInfo.TYPE_SHELL) {
+                        AppInfo shellInfo = new AppInfo(slot.name, slot.shellCommand,
+                                generateShellIcon(context, slot.name));
+                        apps.add(shellInfo);
                     } else {
-                        ApplicationInfo ai = pm.getApplicationInfo(pkg, 0);
-                        String name = ai.loadLabel(pm).toString();
-                        Drawable icon = ai.loadIcon(pm);
-                        appInfo = new AppInfo(name, pkg, icon);
-                        appInfoCache.put(pkg, appInfo);
+                        String pkg = slot.packageName;
+                        AppInfo appInfo;
+                        if (!cacheExpired && appInfoCache.containsKey(pkg)) {
+                            appInfo = appInfoCache.get(pkg);
+                        } else {
+                            ApplicationInfo ai = pm.getApplicationInfo(pkg, 0);
+                            String name = ai.loadLabel(pm).toString();
+                            Drawable icon = ai.loadIcon(pm);
+                            appInfo = new AppInfo(name, pkg, icon);
+                            appInfoCache.put(pkg, appInfo);
+                        }
+                        apps.add(appInfo);
                     }
-                    apps.add(appInfo);
                     appCount++;
                 } catch (Exception ignored) {
                 }
@@ -667,15 +708,28 @@ public class MainHook implements IXposedHookLoadPackage {
     }
 
     /**
-     * 应用信息类，用于存储应用的图标、名称和包名
+     * 应用/命令信息类，用于存储应用或 shell 命令的图标、名称和包名
      */
     private static class AppInfo {
+        static final int TYPE_APP = 0;
+        static final int TYPE_SHELL = 1;
+        int type;
         String name;
         String packageName;
+        String shellCommand;
         Drawable icon;
+
         AppInfo(String name, String packageName, Drawable icon) {
+            this.type = TYPE_APP;
             this.name = name;
             this.packageName = packageName;
+            this.icon = icon;
+        }
+
+        AppInfo(String name, String shellCommand, Drawable icon) {
+            this.type = TYPE_SHELL;
+            this.name = name;
+            this.shellCommand = shellCommand;
             this.icon = icon;
         }
     }
@@ -799,6 +853,32 @@ public class MainHook implements IXposedHookLoadPackage {
         }
     }
 
+    /**
+     * 为 Shell 命令生成带有文字 Bitmap 的 Drawable 图标
+     */
+    private static Drawable generateShellIcon(Context context, String label) {
+        int size = getIconSize();
+        String text = label.length() > 2 ? label.substring(0, 2) : label;
+        android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas canvas = new android.graphics.Canvas(bitmap);
+
+        android.graphics.Paint bgPaint = new android.graphics.Paint();
+        bgPaint.setAntiAlias(true);
+        bgPaint.setColor(0xFF2D2D2D);
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, bgPaint);
+
+        android.graphics.Paint textPaint = new android.graphics.Paint();
+        textPaint.setAntiAlias(true);
+        textPaint.setColor(0xFF00FF00);
+        textPaint.setTextSize(size * 0.4f);
+        textPaint.setTextAlign(android.graphics.Paint.Align.CENTER);
+        android.graphics.Paint.FontMetrics fm = textPaint.getFontMetrics();
+        float y = size / 2f - (fm.ascent + fm.descent) / 2f;
+        canvas.drawText(text, size / 2f, y, textPaint);
+
+        return new android.graphics.drawable.BitmapDrawable(context.getResources(), bitmap);
+    }
+
     private static int getStatusBarHeight(Context ctx) {
         try {
             @SuppressLint({"InternalInsetResource", "DiscouragedApi"}) int resId = ctx.getResources().getIdentifier("status_bar_height", "dimen", "android");
@@ -865,6 +945,21 @@ public class MainHook implements IXposedHookLoadPackage {
             }
         }
         return -1;
+    }
+
+    /**
+     * 执行 Shell 命令（root 权限）
+     */
+    private static boolean executeShellCommand(String command) {
+        try {
+            Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", command});
+            p.waitFor();
+            log("Shell命令执行成功: " + command);
+            return true;
+        } catch (Exception e) {
+            log("执行Shell命令失败: " + e.getMessage());
+            return false;
+        }
     }
 
     private static boolean startAppInFloatMode(String pkg) {

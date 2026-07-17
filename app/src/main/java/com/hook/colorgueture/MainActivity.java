@@ -72,17 +72,29 @@ public class MainActivity extends AppCompatActivity {
 
 
     /**
-     * 应用信息类，用于存储应用的图标、名称和包名
+     * 应用信息类，用于存储应用或 shell 命令的图标、名称和包名
      */
     private static class AppInfo {
-        String name;
-        String packageName;
-        Drawable icon;
+        public static final int TYPE_APP = 0;
+        public static final int TYPE_SHELL = 1;
+
+        int type; // 0=应用, 1=shell命令
+        String name; // 应用名 或 shell 备注
+        String packageName; // 应用包名（type=APP）
+        String shellCommand; // shell 命令内容（type=SHELL）
+        Drawable icon; // 应用图标 或 shell 生成的图标
 
         AppInfo(String name, String packageName, Drawable icon) {
+            this.type = TYPE_APP;
             this.name = name;
             this.packageName = packageName;
             this.icon = icon;
+        }
+
+        AppInfo(String name, String shellCommand) {
+            this.type = TYPE_SHELL;
+            this.name = name;
+            this.shellCommand = shellCommand;
         }
 
         @NonNull
@@ -916,6 +928,106 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
+     * 显示类型选择对话框：选择应用 或 自定义 Shell 命令
+     */
+    private void showSlotTypeChoiceDialog(final int position) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("选择操作类型");
+        String[] choices = {"选择应用", "自定义 Shell 命令"};
+        builder.setSingleChoiceItems(choices, -1, (dialog, which) -> {
+            dialog.dismiss();
+            if (which == 0) {
+                showAppSelectionDialog(position);
+            } else {
+                showShellInputDialog(position);
+            }
+        });
+        builder.setNegativeButton("取消", null);
+        builder.show();
+    }
+
+    /**
+     * 显示 Shell 命令输入对话框
+     */
+    private void showShellInputDialog(final int position) {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(50, 30, 50, 30);
+
+        // 备注标签输入
+        TextView labelHint = new TextView(this);
+        labelHint.setText("备注名称");
+        labelHint.setTextSize(14);
+        layout.addView(labelHint);
+
+        EditText labelInput = new EditText(this);
+        labelInput.setHint("例如：打开手电筒");
+        layout.addView(labelInput);
+
+        // 命令输入
+        TextView cmdHint = new TextView(this);
+        cmdHint.setText("Shell 命令（root 执行）");
+        cmdHint.setTextSize(14);
+        LinearLayout.LayoutParams cmdMargin = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        cmdMargin.topMargin = 30;
+        cmdHint.setLayoutParams(cmdMargin);
+        layout.addView(cmdHint);
+
+        EditText cmdInput = new EditText(this);
+        cmdInput.setHint("例如：cmd battery set status 2");
+        layout.addView(cmdInput);
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("自定义 Shell 命令");
+        builder.setView(layout);
+        builder.setPositiveButton("确定", (dialog, which) -> {
+            String label = labelInput.getText().toString().trim();
+            String cmd = cmdInput.getText().toString().trim();
+            if (!cmd.isEmpty()) {
+                if (label.isEmpty()) {
+                    label = "Shell";
+                }
+                selectedApps.set(position, new AppInfo(label, cmd));
+                appAdapter.notifyDataSetChanged();
+                saveSelectedApps();
+            }
+        });
+        builder.setNegativeButton("取消", null);
+        builder.show();
+    }
+
+    /**
+     * 为 Shell 命令生成一个带文字的圆形图标
+     */
+    private static Drawable generateShellIcon(Context context, String label) {
+        int size = 150;
+        String text = label.length() > 2 ? label.substring(0, 2) : label;
+        android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas canvas = new android.graphics.Canvas(bitmap);
+
+        // 画圆形背景（深色终端风格）
+        android.graphics.Paint bgPaint = new android.graphics.Paint();
+        bgPaint.setAntiAlias(true);
+        bgPaint.setColor(0xFF2D2D2D); // 深灰色
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, bgPaint);
+
+        // 画文字
+        android.graphics.Paint textPaint = new android.graphics.Paint();
+        textPaint.setAntiAlias(true);
+        textPaint.setColor(0xFF00FF00); // 绿色终端文字
+        textPaint.setTextSize(size * 0.4f);
+        textPaint.setTextAlign(android.graphics.Paint.Align.CENTER);
+        android.graphics.Paint.FontMetrics fm = textPaint.getFontMetrics();
+        float y = size / 2f - (fm.ascent + fm.descent) / 2f;
+        canvas.drawText(text, size / 2f, y, textPaint);
+
+        return new android.graphics.drawable.BitmapDrawable(context.getResources(), bitmap);
+    }
+
+    /**
      * 保存选择的应用到外部存储
      */
     private void saveSelectedApps() {
@@ -929,7 +1041,19 @@ public class MainActivity extends AppCompatActivity {
         JSONArray jsonArray = new JSONArray();
         for (AppInfo app : selectedApps) {
             if (app != null) {
-                jsonArray.put(app.packageName);
+                org.json.JSONObject obj = new org.json.JSONObject();
+                try {
+                    if (app.type == AppInfo.TYPE_SHELL) {
+                        obj.put("t", AppInfo.TYPE_SHELL);
+                        obj.put("c", app.shellCommand != null ? app.shellCommand : "");
+                        obj.put("l", app.name != null ? app.name : "");
+                    } else {
+                        obj.put("t", AppInfo.TYPE_APP);
+                        obj.put("p", app.packageName != null ? app.packageName : "");
+                    }
+                    jsonArray.put(obj);
+                } catch (org.json.JSONException ignored) {
+                }
             }
         }
         final String jsonString = jsonArray.toString();
@@ -1083,57 +1207,69 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * 从 SharedPreferences 加载选择的应用
+     * 从 SharedPreferences 加载选择的应用或 shell 命令
      *
      * @return 应用列表，确保有 MAX_APPS 个元素
      */
     private List<AppInfo> loadSelectedApps() {
         List<AppInfo> apps = new ArrayList<>();
         String json = prefs.getString("selected_apps", null);
-        // android.util.Log.d("ColorGueture", "从 SharedPreferences 加载应用列表，读取到的 JSON: " + json);
 
         if (json != null) {
             try {
                 JSONArray jsonArray = new JSONArray(json);
-                // android.util.Log.d("ColorGueture", "解析 JSON 成功，应用数量: " + jsonArray.length());
 
                 // 创建包名到AppInfo的映射，提高查找效率
                 java.util.HashMap<String, AppInfo> packageNameMap = new java.util.HashMap<>();
                 for (AppInfo app : installedApps) {
-                    packageNameMap.put(app.packageName, app);
+                    if (app != null && app.packageName != null) {
+                        packageNameMap.put(app.packageName, app);
+                    }
                 }
 
                 // 最多加载MAX_APPS个应用
                 int maxLoad = Math.min(jsonArray.length(), MAX_APPS);
                 for (int i = 0; i < maxLoad; i++) {
-                    String packageName = jsonArray.getString(i);
-                    // android.util.Log.d("ColorGueture", "加载应用包名: " + packageName);
-                    // 从映射中快速查找对应的应用
-                    AppInfo app = packageNameMap.get(packageName);
-                    if (app != null) {
-                        apps.add(app);
-                        // android.util.Log.d("ColorGueture", "找到应用: " + app.name + " (" + app.packageName + ")");
-                    } else {
-                        // android.util.Log.d("ColorGueture", "未找到应用: " + packageName);
+                    try {
+                        Object element = jsonArray.get(i);
+                        if (element instanceof org.json.JSONObject) {
+                            // 新格式：JSON对象
+                            org.json.JSONObject obj = (org.json.JSONObject) element;
+                            int type = obj.optInt("t", AppInfo.TYPE_APP);
+                            if (type == AppInfo.TYPE_SHELL) {
+                                String cmd = obj.optString("c", "");
+                                String label = obj.optString("l", "");
+                                if (!cmd.isEmpty()) {
+                                    AppInfo shellApp = new AppInfo(label.isEmpty() ? "Shell" : label, cmd);
+                                    apps.add(shellApp);
+                                }
+                            } else {
+                                String pkg = obj.optString("p", "");
+                                if (!pkg.isEmpty()) {
+                                    AppInfo app = packageNameMap.get(pkg);
+                                    if (app != null) {
+                                        apps.add(app);
+                                    }
+                                }
+                            }
+                        } else if (element instanceof String) {
+                            // 兼容旧格式：纯字符串包名
+                            String packageName = (String) element;
+                            AppInfo app = packageNameMap.get(packageName);
+                            if (app != null) {
+                                apps.add(app);
+                            }
+                        }
+                    } catch (Exception ignored) {
                     }
                 }
-            } catch (JSONException e) {
-                // android.util.Log.e("ColorGueture", "解析 JSON 失败: " + e.getMessage());
-                e.printStackTrace();
+            } catch (Exception ignored) {
             }
-        } else {
-            // android.util.Log.d("ColorGueture", "未读取到应用列表数据");
         }
 
         // 确保列表中有 MAX_APPS 个元素，不足的用 null 填充
         while (apps.size() < MAX_APPS) {
             apps.add(null);
-        }
-
-        // android.util.Log.d("ColorGueture", "加载完成，应用列表大小: " + apps.size());
-        for (int i = 0; i < apps.size(); i++) {
-            AppInfo app = apps.get(i);
-            // android.util.Log.d("ColorGueture", "apps[" + i + "]: " + (app != null ? app.name + " (" + app.packageName + ")" : "null"));
         }
 
         return apps;
@@ -1222,14 +1358,20 @@ public class MainActivity extends AppCompatActivity {
             AppInfo app = apps.get(position);
 
             if (app != null) {
-                // 已选择的应用
-                if (app.icon != null) {
-                    holder.imageView.setImageDrawable(app.icon);
+                // 已选择的应用或 shell 命令
+                if (app.type == AppInfo.TYPE_SHELL) {
+                    // Shell 命令：生成终端风格图标
+                    holder.imageView.setImageDrawable(generateShellIcon(holder.itemView.getContext(), app.name));
+                    holder.textView.setText(app.name);
                 } else {
-                    // 如果图标为 null，使用默认图标
-                    holder.imageView.setImageResource(android.R.drawable.ic_menu_info_details);
+                    // 应用图标
+                    if (app.icon != null) {
+                        holder.imageView.setImageDrawable(app.icon);
+                    } else {
+                        holder.imageView.setImageResource(android.R.drawable.ic_menu_info_details);
+                    }
+                    holder.textView.setText(app.name);
                 }
-                holder.textView.setText(app.name);
 
                 // 长按删除
                 holder.itemView.setOnLongClickListener(v -> {
@@ -1239,15 +1381,15 @@ public class MainActivity extends AppCompatActivity {
                     return true;
                 });
 
-                // 点击无操作
+                // 点击无操作（长按即可删除）
                 holder.itemView.setOnClickListener(null);
             } else {
                 // 空白框
                 holder.imageView.setImageResource(android.R.drawable.ic_input_add);
                 holder.textView.setText("");
 
-                // 点击选择应用
-                holder.itemView.setOnClickListener(v -> showAppSelectionDialog(position));
+                // 点击选择应用或自定义 Shell 命令
+                holder.itemView.setOnClickListener(v -> showSlotTypeChoiceDialog(position));
 
                 // 长按无操作
                 holder.itemView.setOnLongClickListener(null);
