@@ -285,8 +285,8 @@ public class MainHook implements IXposedHookLoadPackage {
                                 } else {
                                     executed = startAppInFloatMode(appInfo.packageName);
                                 }
+                                hidePopup();
                                 if (executed) {
-                                    hidePopup();
                                     param.setResult(null);
                                     try {
                                         MotionEvent cancelEvent = MotionEvent.obtain(
@@ -562,7 +562,7 @@ public class MainHook implements IXposedHookLoadPackage {
                                 String cmd = obj.optString("c", "");
                                 String label = obj.optString("l", "");
                                 if (!cmd.isEmpty()) {
-                                    list.add(new AppInfo(label.isEmpty() ? "Shell" : label, cmd, null));
+                                    list.add(new AppInfo(label.isEmpty() ? "Shell" : label, null, cmd));
                                 }
                             } else {
                                 String pkg = obj.optString("p", "");
@@ -603,8 +603,8 @@ public class MainHook implements IXposedHookLoadPackage {
                 try {
                     if (slot.type == AppInfo.TYPE_SHELL) {
                         // Shell 命令：生成终端风格图标
-                        AppInfo shellInfo = new AppInfo(slot.name, slot.shellCommand,
-                                generateShellIcon(context, slot.name));
+                        AppInfo shellInfo = new AppInfo(slot.name, generateShellIcon(context, slot.name),
+                                slot.shellCommand);
                         apps.add(shellInfo);
                     } else {
                         // 应用：通过 PackageManager 加载
@@ -672,8 +672,8 @@ public class MainHook implements IXposedHookLoadPackage {
                 if (appCount >= maxApps) break;
                 try {
                     if (slot.type == AppInfo.TYPE_SHELL) {
-                        AppInfo shellInfo = new AppInfo(slot.name, slot.shellCommand,
-                                generateShellIcon(context, slot.name));
+                        AppInfo shellInfo = new AppInfo(slot.name, generateShellIcon(context, slot.name),
+                                slot.shellCommand);
                         apps.add(shellInfo);
                     } else {
                         String pkg = slot.packageName;
@@ -726,7 +726,7 @@ public class MainHook implements IXposedHookLoadPackage {
             this.icon = icon;
         }
 
-        AppInfo(String name, String shellCommand, Drawable icon) {
+        AppInfo(String name, Drawable icon, String shellCommand) {
             this.type = TYPE_SHELL;
             this.name = name;
             this.shellCommand = shellCommand;
@@ -953,9 +953,24 @@ public class MainHook implements IXposedHookLoadPackage {
     private static boolean executeShellCommand(String command) {
         try {
             Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", command});
-            p.waitFor();
-            log("Shell命令执行成功: " + command);
-            return true;
+            // 消费 stdout，防止管道缓冲区满导致死锁
+            BufferedReader stdoutReader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            StringBuilder stdout = new StringBuilder();
+            String line;
+            while ((line = stdoutReader.readLine()) != null) {
+                stdout.append(line);
+            }
+            stdoutReader.close();
+            // 消费 stderr
+            BufferedReader stderrReader = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+            StringBuilder stderr = new StringBuilder();
+            while ((line = stderrReader.readLine()) != null) {
+                stderr.append(line);
+            }
+            stderrReader.close();
+            int exitCode = p.waitFor();
+            log("Shell命令执行完成, exitCode=" + exitCode + ", stdout=" + stdout + ", stderr=" + stderr);
+            return exitCode == 0;
         } catch (Exception e) {
             log("执行Shell命令失败: " + e.getMessage());
             return false;

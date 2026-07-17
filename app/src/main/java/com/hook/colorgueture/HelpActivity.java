@@ -1,7 +1,6 @@
 package com.hook.colorgueture;
 
 import android.os.Bundle;
-import android.view.Window;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -20,7 +19,6 @@ public class HelpActivity extends AppCompatActivity {
         }
 
         EdgeToEdge.enable(this);
-        supportRequestWindowFeature(Window.FEATURE_NO_TITLE);
         setContentView(R.layout.activity_help);
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content), (v, insets) -> {
