@@ -41,7 +41,13 @@ public enum PrefKeys {
      * 是否启用震动
      * 值：true/false
      */
-    ENABLE_VIBRATION("enable_vibration");
+    ENABLE_VIBRATION("enable_vibration"),
+
+    /**
+     * 是否启用通知点击悬浮窗启动
+     * 值：true/false
+     */
+    NOTIFICATION_CLICK_ENABLED("notification_click_enabled");
 
     /**
      * 配置键名

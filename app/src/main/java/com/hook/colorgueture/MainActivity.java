@@ -63,10 +63,12 @@ public class MainActivity extends AppCompatActivity {
     private int appAngle;
     private int secondCircleRadius;
     private boolean enableVibration;
+    private boolean notificationClickEnabled;
     private TextView iconSizeValue;
     private TextView appAngleValue;
     private TextView secondCircleRadiusValue;
     private Switch vibrationSwitch;
+    private Switch notificationClickSwitch;
 
 
     /**
@@ -129,6 +131,7 @@ public class MainActivity extends AppCompatActivity {
         SeekBar secondCircleRadiusSeekBar = findViewById(R.id.secondCircleRadiusSeekBar);
         secondCircleRadiusValue = findViewById(R.id.secondCircleRadiusValue);
         vibrationSwitch = findViewById(R.id.vibrationSwitch);
+        notificationClickSwitch = findViewById(R.id.notificationClickSwitch);
 
         // 初始化 SharedPreferences，使用 MODE_WORLD_READABLE
         @SuppressLint("WorldReadableFiles")
@@ -140,6 +143,7 @@ public class MainActivity extends AppCompatActivity {
         appAngle = prefs.getInt(PrefKeys.APP_ANGLE.getKey(), 30);
         secondCircleRadius = prefs.getInt(PrefKeys.SECOND_CIRCLE_RADIUS.getKey(), 150);
         enableVibration = prefs.getBoolean(PrefKeys.ENABLE_VIBRATION.getKey(), true); // 默认启用震动
+        notificationClickEnabled = prefs.getBoolean(PrefKeys.NOTIFICATION_CLICK_ENABLED.getKey(), true); // 默认启用通知点击悬浮窗
 
         // 设置控件初始值
         iconSizeSeekBar.setProgress(iconSize);
@@ -149,12 +153,21 @@ public class MainActivity extends AppCompatActivity {
         secondCircleRadiusSeekBar.setProgress(secondCircleRadius);
         secondCircleRadiusValue.setText(String.valueOf(secondCircleRadius));
         vibrationSwitch.setChecked(enableVibration);
+        notificationClickSwitch.setChecked(notificationClickEnabled);
 
         // 震动开关监听器
         vibrationSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             enableVibration = isChecked;
             SharedPreferences.Editor editor = prefs.edit();
             editor.putBoolean(PrefKeys.ENABLE_VIBRATION.getKey(), isChecked);
+            editor.apply();
+        });
+
+        // 通知点击悬浮窗开关监听器
+        notificationClickSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            notificationClickEnabled = isChecked;
+            SharedPreferences.Editor editor = prefs.edit();
+            editor.putBoolean(PrefKeys.NOTIFICATION_CLICK_ENABLED.getKey(), isChecked);
             editor.apply();
         });
 

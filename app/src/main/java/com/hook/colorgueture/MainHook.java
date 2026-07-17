@@ -334,6 +334,10 @@ public class MainHook implements IXposedHookLoadPackage {
                     XposedBridge.hookMethod(m, new XC_MethodHook() {
                         @Override
                         protected void beforeHookedMethod(MethodHookParam param) {
+                            // 如果用户关闭了通知点击悬浮窗功能，则不拦截
+                            if (!getConfigBoolean(PrefKeys.NOTIFICATION_CLICK_ENABLED.getKey())) {
+                                return;
+                            }
                             Object thisObj = param.thisObject;
                             Object entryObj = XposedHelpers.getObjectField(thisObj, "f$3");
                             if (entryObj != null) {

@@ -218,6 +218,27 @@
             app:layout_constraintTop_toTopOf="@+id/vibrationTitle"
             app:layout_constraintBottom_toBottomOf="@+id/vibrationTitle" />
 
+        <TextView
+            android:id="@+id/notificationClickTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="通知小窗启动:"
+            android:textColor="@color/text_color"
+            android:textSize="16sp"
+            android:layout_marginTop="16dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/vibrationSwitch"
+            tools:ignore="HardcodedText" />
+
+        <android.widget.Switch
+            android:id="@+id/notificationClickSwitch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            app:layout_constraintStart_toEndOf="@+id/notificationClickTitle"
+            app:layout_constraintTop_toTopOf="@+id/notificationClickTitle"
+            app:layout_constraintBottom_toBottomOf="@+id/notificationClickTitle" />
+
     </androidx.constraintlayout.widget.ConstraintLayout>
 
 
