@@ -6,7 +6,6 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
@@ -24,6 +23,7 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Switch;
@@ -46,6 +46,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
@@ -144,6 +145,7 @@ public class MainActivity extends AppCompatActivity {
         secondCircleRadiusValue = findViewById(R.id.secondCircleRadiusValue);
         vibrationSwitch = findViewById(R.id.vibrationSwitch);
         notificationClickSwitch = findViewById(R.id.notificationClickSwitch);
+        Button editOrderButton = findViewById(R.id.editOrderButton);
 
         // 初始化 SharedPreferences，使用 MODE_WORLD_READABLE
         @SuppressLint("WorldReadableFiles")
@@ -188,6 +190,9 @@ public class MainActivity extends AppCompatActivity {
             Intent intent = new Intent(MainActivity.this, HelpActivity.class);
             startActivity(intent);
         });
+
+        // 编辑排序按钮
+        editOrderButton.setOnClickListener(v -> showReorderDialog());
 
         // 设置图标大小滑块监听器
         iconSizeSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -849,7 +854,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * 获取设备上已安装的应用列表
+     * 获取设备上已安装的应用列表（包含系统应用）
      *
      * @return 应用列表
      */
@@ -857,23 +862,32 @@ public class MainActivity extends AppCompatActivity {
         List<AppInfo> apps = new ArrayList<>();
         PackageManager pm = getPackageManager();
 
-        // 创建一个intent来获取所有可启动的应用
-        Intent intent = new Intent(Intent.ACTION_MAIN, null);
-        intent.addCategory(Intent.CATEGORY_LAUNCHER);
+        // 获取所有已安装的应用（包括系统应用）
+        List<ApplicationInfo> installedApps = pm.getInstalledApplications(PackageManager.MATCH_ALL);
 
-        List<ResolveInfo> resolveInfos = pm.queryIntentActivities(intent, 0);
-
-        for (ResolveInfo resolveInfo : resolveInfos) {
-            ApplicationInfo appInfo = resolveInfo.activityInfo.applicationInfo;
+        for (ApplicationInfo appInfo : installedApps) {
             String appName = appInfo.loadLabel(pm).toString();
+            if (appName == null || appName.isEmpty()) {
+                appName = appInfo.packageName;
+            }
             String packageName = appInfo.packageName;
             Drawable icon = appInfo.loadIcon(pm);
-            apps.add(new AppInfo(appName, packageName, icon));
+            AppInfo app = new AppInfo(appName, packageName, icon != null ? icon : getDrawable(android.R.drawable.ic_menu_info_details));
+            apps.add(app);
         }
 
         // 按应用名称排序
         apps.sort(Comparator.comparing(a -> a.name));
-        return apps;
+        // 包名相同的去重（系统应用可能有多个 entry）
+        List<AppInfo> uniqueApps = new ArrayList<>();
+        java.util.HashSet<String> seenPkgs = new java.util.HashSet<>();
+        for (AppInfo app : apps) {
+            if (!seenPkgs.contains(app.packageName)) {
+                seenPkgs.add(app.packageName);
+                uniqueApps.add(app);
+            }
+        }
+        return uniqueApps;
     }
 
     /**
@@ -997,6 +1011,111 @@ public class MainActivity extends AppCompatActivity {
         });
         builder.setNegativeButton("取消", null);
         builder.show();
+    }
+
+    /**
+     * 显示编辑排序对话框，支持上下移动调整应用顺序
+     */
+    private void showReorderDialog() {
+        // 收集所有非空的已选项
+        List<AppInfo> nonNullApps = new ArrayList<>();
+        List<Integer> originalIndices = new ArrayList<>();
+        for (int i = 0; i < selectedApps.size(); i++) {
+            AppInfo app = selectedApps.get(i);
+            if (app != null) {
+                nonNullApps.add(app);
+                originalIndices.add(i);
+            }
+        }
+        if (nonNullApps.isEmpty()) {
+            return;
+        }
+
+        final List<AppInfo> reorderList = new ArrayList<>(nonNullApps);
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("调整顺序");
+
+        LinearLayout listLayout = new LinearLayout(this);
+        listLayout.setOrientation(LinearLayout.VERTICAL);
+        listLayout.setPadding(40, 20, 40, 20);
+
+        for (int i = 0; i < reorderList.size(); i++) {
+            AppInfo app = reorderList.get(i);
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(8, 8, 8, 8);
+
+            // 序号
+            TextView indexTv = new TextView(this);
+            indexTv.setText((i + 1) + ".");
+            indexTv.setTextSize(16);
+            indexTv.setWidth(60);
+            row.addView(indexTv);
+
+            // 名称
+            TextView nameTv = new TextView(this);
+            nameTv.setText(app.name);
+            nameTv.setTextSize(16);
+            nameTv.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+            row.addView(nameTv);
+
+            // 上移按钮
+            Button upBtn = new Button(this);
+            upBtn.setText("▲");
+            upBtn.setTextSize(12);
+            if (i == 0) upBtn.setEnabled(false);
+            final int idx = i;
+            upBtn.setOnClickListener(v -> {
+                if (idx > 0) {
+                    Collections.swap(reorderList, idx, idx - 1);
+                    applyReorder(reorderList, originalIndices);
+                    dialog.dismiss();
+                    showReorderDialog();
+                }
+            });
+            row.addView(upBtn);
+
+            // 下移按钮
+            Button downBtn = new Button(this);
+            downBtn.setText("▼");
+            downBtn.setTextSize(12);
+            if (i == reorderList.size() - 1) downBtn.setEnabled(false);
+            downBtn.setOnClickListener(v -> {
+                if (idx < reorderList.size() - 1) {
+                    Collections.swap(reorderList, idx, idx + 1);
+                    applyReorder(reorderList, originalIndices);
+                    dialog.dismiss();
+                    showReorderDialog();
+                }
+            });
+            row.addView(downBtn);
+
+            listLayout.addView(row);
+        }
+
+        ScrollView scrollView = new ScrollView(this);
+        scrollView.addView(listLayout);
+        builder.setView(scrollView);
+        builder.setPositiveButton("完成", null);
+        AlertDialog dialog = builder.create();
+        dialog.show();
+    }
+
+    /**
+     * 将 reorderList 的排列应用到 selectedApps 的原始位置上
+     */
+    private void applyReorder(List<AppInfo> reorderList, List<Integer> originalIndices) {
+        // 先把所有非空位置置空
+        for (int idx : originalIndices) {
+            selectedApps.set(idx, null);
+        }
+        // 按新顺序放回
+        for (int i = 0; i < reorderList.size(); i++) {
+            selectedApps.set(originalIndices.get(i), reorderList.get(i));
+        }
+        saveSelectedApps();
+        appAdapter.notifyDataSetChanged();
     }
 
     /**
